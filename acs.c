@@ -99,7 +99,7 @@ static const char *argv0;
 
 static void usage(void)
 {
-        printf("Usage:\t%s [options] command\n", argv0);
+        printf("Usage:\t%s <dev>\n", argv0);
         printf("Options:\n");
         printf("\t--debug\t\tenable netlink debugging\n");
 }
