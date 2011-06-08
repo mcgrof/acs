@@ -182,12 +182,6 @@ static int call_survey_freq(struct nl80211_state *state, int devidx, int freq)
 	return 2;
 }
 
-/* Wants survey data from survey dump from all frequencies */
-static int call_survey(struct nl80211_state *state, int devidx)
-{
-	return call_survey_freq(state, devidx, 0);
-}
-
 /*
  * Discards all survey data and simply uses the survey for frequency
  * list gathering
@@ -195,6 +189,22 @@ static int call_survey(struct nl80211_state *state, int devidx)
 static int get_freq_list(struct nl80211_state *state, int devidx)
 {
 	return call_survey_freq(state, devidx, -1);
+}
+
+/* Studies all frequencies known */
+static int study_freqs(struct nl80211_state *state, int devidx)
+{
+	int err;
+	struct freq_item *freq;
+
+	list_for_each_entry(freq, &freq_list, list_member) {
+		/* XXX: switch to the frequency for a while */
+		err = call_survey_freq(state, devidx, freq->center_freq);
+		if (err)
+			return err;
+	}
+
+	return 0;
 }
 
 int main(int argc, char **argv)
@@ -247,7 +257,7 @@ int main(int argc, char **argv)
 		return err;
 
 	while (surveys--) {
-		err = call_survey(&nlstate, devidx);
+		err = study_freqs(&nlstate, devidx);
 		if (err)
 			return err;
 	}

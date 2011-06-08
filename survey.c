@@ -11,11 +11,7 @@
 #include "nl80211.h"
 #include "acs.h"
 
-struct freq_item {
-	__u16 center_freq;
-	struct list_head list_member;
-	struct list_head survey_list;
-};
+LIST_HEAD(freq_list);
 
 /**
  * struct survey_info - channel survey info
@@ -36,9 +32,6 @@ struct freq_survey {
 	__s8 noise;
 	struct list_head list_member;
 };
-
-
-static LIST_HEAD(freq_list);
 
 static struct freq_item *get_freq_item(__u16 center_freq)
 {

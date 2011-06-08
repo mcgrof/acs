@@ -19,10 +19,18 @@
 #  define nl_sock nl_handle
 #endif
 
+extern struct list_head freq_list;
+
 struct nl80211_state {
 	struct nl_sock *nl_sock;
 	struct nl_cache *nl_cache;
 	struct genl_family *nl80211;
+};
+
+struct freq_item {
+	__u16 center_freq;
+	struct list_head list_member;
+	struct list_head survey_list;
 };
 
 int handle_survey_dump(struct nl_msg *msg, void *arg);
