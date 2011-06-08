@@ -1,6 +1,6 @@
 #!/bin/sh
 
-VERSION="0.0.3"
+VERSION="0.0.4"
 OUT="$1"
 
 echo '#include "acs.h"' > "$OUT"
