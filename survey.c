@@ -11,6 +11,33 @@
 #include "nl80211.h"
 #include "acs.h"
 
+struct freq_item {
+	__u16 center_freq;
+	struct list_head list_member;
+	struct list_head survey_list;
+};
+
+/**
+ * struct survey_info - channel survey info
+ *
+ * @freq: center of frequency for the surveyed channel
+ * @noise: channel noise in dBm
+ * @channel_time: amount of time in ms the radio spent on the channel
+ * @channel_time_rx: amount of time the radio spent receiving data
+ * @channel_time_tx: amount of time the radio spent transmitting data
+ */
+struct freq_survey {
+	__u32 ifidx;
+	__u16 center_freq;
+	__u64 channel_time;
+	__u64 channel_time_busy;
+	__u64 channel_time_rx;
+	__u64 channel_time_tx;
+	__s8 noise;
+	struct list_head list_member;
+};
+
+
 static LIST_HEAD(freq_list);
 
 static struct freq_item *get_freq_item(__u16 center_freq)
