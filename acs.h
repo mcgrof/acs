@@ -56,6 +56,12 @@ struct cmd {
 	const struct cmd *parent;
 };
 
+struct freq_item {
+	__u16 center_freq;
+	struct list_head list_member;
+	struct list_head survey_list;
+};
+
 /**
  * struct survey_info - channel survey info
  *
@@ -66,6 +72,7 @@ struct cmd {
  * @channel_time_tx: amount of time the radio spent transmitting data
  */
 struct freq_survey {
+	__u32 ifidx;
 	__u16 center_freq;
 	__u64 channel_time;
 	__u64 channel_time_busy;
@@ -139,8 +146,8 @@ int handle_survey_dump(struct nl80211_state *state,
 		       struct nl_cb *cb,
 		       struct nl_msg *msg,
 		       int argc, char **argv);
-void parse_survey_list(void);
-void clean_survey_list(void);
+void parse_freq_list(void);
+void clean_freq_list(void);
 
 #define BIT(x) (1ULL<<(x))
 
