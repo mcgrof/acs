@@ -191,6 +191,7 @@ int main(int argc, char **argv)
 	struct nl80211_state nlstate;
 	int devidx = 0;
 	int err;
+	unsigned int surveys = 10;
 
         /* strip off self */
 	argc--;
@@ -230,12 +231,11 @@ int main(int argc, char **argv)
 	if (devidx < 0)
 		return -errno;
 
-	err = call_survey(&nlstate, devidx);
-
-	if (err == 1) {
-		usage();
-	} else if (err < 0)
-		fprintf(stderr, "command failed: %s (%d)\n", strerror(-err), err);
+	while (surveys--) {
+		err = call_survey(&nlstate, devidx);
+		if (err)
+			return err;
+	}
 
 	parse_freq_list();
 
