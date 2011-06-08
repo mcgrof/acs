@@ -25,6 +25,7 @@ static struct freq_item *get_freq_item(__u16 center_freq)
 	freq = (struct freq_item*) malloc(sizeof(struct freq_item));
 	if (!freq)
 		return NULL;
+	memset(freq, 0, sizeof(freq));
 
 	freq->center_freq = center_freq;
 	INIT_LIST_HEAD(&freq->survey_list);
@@ -42,11 +43,13 @@ static int add_survey(struct nlattr **sinfo, __u32 ifidx)
 	item = (struct survey_item *) malloc(sizeof(struct survey_item));
 	if  (!item)
 		return -ENOMEM;
+	memset(item, 0, sizeof(item));
 
 	INIT_LIST_HEAD(&item->list_member);
 	survey = &item->survey;
 
 	survey->ifidx = ifidx;
+	survey->noise = (int8_t) nla_get_u8(sinfo[NL80211_SURVEY_INFO_NOISE]);
 	survey->center_freq = nla_get_u32(sinfo[NL80211_SURVEY_INFO_FREQUENCY]);
 	survey->channel_time = nla_get_u64(sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME]);
 	survey->channel_time_busy = nla_get_u64(sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME_BUSY]);
