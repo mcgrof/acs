@@ -45,10 +45,6 @@ struct freq_survey {
 	__u64 channel_time_rx;
 	__u64 channel_time_tx;
 	__s8 noise;
-};
-
-struct survey_item {
-	struct freq_survey survey;
 	struct list_head list_member;
 };
 

@@ -36,17 +36,15 @@ static struct freq_item *get_freq_item(__u16 center_freq)
 
 static int add_survey(struct nlattr **sinfo, __u32 ifidx)
 {
-	struct survey_item *item;
 	struct freq_survey *survey;
 	struct freq_item *freq;
 
-	item = (struct survey_item *) malloc(sizeof(struct survey_item));
-	if  (!item)
+	survey = (struct freq_survey*) malloc(sizeof(struct freq_survey));
+	if  (!survey)
 		return -ENOMEM;
-	memset(item, 0, sizeof(item));
+	memset(survey, 0, sizeof(survey));
 
-	INIT_LIST_HEAD(&item->list_member);
-	survey = &item->survey;
+	INIT_LIST_HEAD(&survey->list_member);
 
 	survey->ifidx = ifidx;
 	survey->noise = (int8_t) nla_get_u8(sinfo[NL80211_SURVEY_INFO_NOISE]);
@@ -58,11 +56,11 @@ static int add_survey(struct nlattr **sinfo, __u32 ifidx)
 
 	freq = get_freq_item(survey->center_freq);
 	if (!freq) {
-		free(item);
+		free(survey);
 		return -ENOMEM;
 	}
 
-	list_add(&item->list_member, &freq->survey_list);
+	list_add(&survey->list_member, &freq->survey_list);
 
 	return 0;
 }
@@ -135,31 +133,29 @@ int handle_survey_dump(struct nl80211_state *state,
 	return 0;
 }
 
-static void parse_survey(struct survey_item *survey, unsigned int id)
+static void parse_survey(struct freq_survey *survey, unsigned int id)
 {
-	struct freq_survey *fsurvey;
 	char dev[20];
 
-	fsurvey = &survey->survey;
-	if_indextoname(fsurvey->ifidx, dev);
+	if_indextoname(survey->ifidx, dev);
 
 	printf("Survey %d from %s:\n", id, dev);
 
 	printf("\tnoise:\t\t\t\t%d dBm\n",
-	       (int8_t) fsurvey->noise);
+	       (int8_t) survey->noise);
 	printf("\tchannel active time:\t\t%llu ms\n",
-	       (unsigned long long) fsurvey->channel_time);
+	       (unsigned long long) survey->channel_time);
 	printf("\tchannel busy time:\t\t%llu ms\n",
-	       (unsigned long long) fsurvey->channel_time_busy);
+	       (unsigned long long) survey->channel_time_busy);
 	printf("\tchannel receive time:\t\t%llu ms\n",
-	       (unsigned long long) fsurvey->channel_time_rx);
+	       (unsigned long long) survey->channel_time_rx);
 	printf("\tchannel transmit time:\t\t%llu ms\n",
-	       (unsigned long long) fsurvey->channel_time_tx);
+	       (unsigned long long) survey->channel_time_tx);
 }
 
 static void parse_freq(struct freq_item *freq)
 {
-	struct survey_item *item;
+	struct freq_survey *survey;
 	unsigned int i = 0;
 
 	if (list_empty(&freq->survey_list)) {
@@ -169,9 +165,8 @@ static void parse_freq(struct freq_item *freq)
 
 	printf("Survey results for Freq: %d MHz\n", freq->center_freq);
 
-	list_for_each_entry(item , &freq->survey_list, list_member) {
-		parse_survey(item, ++i);
-	}
+	list_for_each_entry(survey, &freq->survey_list, list_member)
+		parse_survey(survey, ++i);
 }
 
 void parse_freq_list(void)
@@ -185,11 +180,11 @@ void parse_freq_list(void)
 
 static void clean_freq_survey(struct freq_item *freq)
 {
-	struct survey_item *item, *tmp;
+	struct freq_survey *survey, *tmp;
 
-	list_for_each_entry_safe(item , tmp, &freq->survey_list, list_member) {
-		list_del_init(&item->list_member);
-		free(item);
+	list_for_each_entry_safe(survey, tmp, &freq->survey_list, list_member) {
+		list_del_init(&survey->list_member);
+		free(survey);
 	}
 }
 
