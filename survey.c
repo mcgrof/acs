@@ -64,13 +64,35 @@ static int add_survey(struct nlattr **sinfo, __u32 ifidx)
 	return 0;
 }
 
+static int check_survey(struct nlattr **sinfo)
+{
+	struct freq_item *freq;
+
+	if (!sinfo[NL80211_SURVEY_INFO_FREQUENCY]) {
+		fprintf(stderr, "bogus frequency!\n");
+		return NL_SKIP;
+	}
+
+	freq = get_freq_item(nla_get_u32(sinfo[NL80211_SURVEY_INFO_FREQUENCY]));
+	if (!freq)
+		return -ENOMEM;
+
+	if (!sinfo[NL80211_SURVEY_INFO_NOISE] ||
+	    !sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME] ||
+	    !sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME_BUSY] ||
+	    !sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME_TX])
+		return NL_SKIP;
+
+	return 0;
+}
+
 static int print_survey_handler(struct nl_msg *msg, void *arg)
 {
 	struct nlattr *tb[NL80211_ATTR_MAX + 1];
 	struct genlmsghdr *gnlh = nlmsg_data(nlmsg_hdr(msg));
 	struct nlattr *sinfo[NL80211_SURVEY_INFO_MAX + 1];
 	__u32 ifidx;
-	struct freq_item *freq;
+	int err;
 
 	static struct nla_policy survey_policy[NL80211_SURVEY_INFO_MAX + 1] = {
 		[NL80211_SURVEY_INFO_FREQUENCY] = { .type = NLA_U32 },
@@ -94,22 +116,9 @@ static int print_survey_handler(struct nl_msg *msg, void *arg)
 		return NL_SKIP;
 	}
 
-	/* XXX: move below sanity checks to helper */
-
-	if (!sinfo[NL80211_SURVEY_INFO_FREQUENCY]) {
-		fprintf(stderr, "bogus frequency!\n");
-		return NL_SKIP;
-	}
-
-	freq = get_freq_item(nla_get_u32(sinfo[NL80211_SURVEY_INFO_FREQUENCY]));
-	if (!freq)
-		return -ENOMEM;
-
-	if (!sinfo[NL80211_SURVEY_INFO_NOISE] ||
-	    !sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME] ||
-	    !sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME_BUSY] ||
-	    !sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME_TX])
-		return NL_SKIP;
+	err = check_survey(sinfo);
+	if (err != 0)
+		return err;
 
 	add_survey(sinfo, ifidx);
 
