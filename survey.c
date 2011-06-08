@@ -11,6 +11,31 @@
 #include "nl80211.h"
 #include "acs.h"
 
+static LIST_HEAD(survey_list);
+
+static int add_survey(struct nlattr **sinfo)
+{
+	struct survey_item *item;
+	struct freq_survey *survey;
+
+	item = (struct survey_item *) malloc(sizeof(struct survey_item));
+	if  (!item)
+		return -ENOMEM;
+
+	INIT_LIST_HEAD(&item->list_member);
+	survey = &item->survey;
+
+	survey->center_freq = nla_get_u32(sinfo[NL80211_SURVEY_INFO_FREQUENCY]);
+	survey->channel_time = nla_get_u64(sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME]);
+	survey->channel_time_busy = nla_get_u64(sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME_BUSY]);
+	survey->channel_time_rx = nla_get_u64(sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME_RX]);
+	survey->channel_time_tx = nla_get_u64(sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME_TX]);
+
+	list_add(&item->list_member, &survey_list);
+
+	return 0;
+}
+
 static int print_survey_handler(struct nl_msg *msg, void *arg)
 {
 	struct nlattr *tb[NL80211_ATTR_MAX + 1];
@@ -40,6 +65,22 @@ static int print_survey_handler(struct nl_msg *msg, void *arg)
 		fprintf(stderr, "failed to parse nested attributes!\n");
 		return NL_SKIP;
 	}
+
+	if (!sinfo[NL80211_SURVEY_INFO_FREQUENCY]) {
+		fprintf(stderr, "bogus frequency!\n");
+		return NL_SKIP;
+	}
+
+	if (!sinfo[NL80211_SURVEY_INFO_NOISE] ||
+	    !sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME] ||
+	    !sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME_BUSY] ||
+	    !sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME_TX]) {
+		printf("\tdisabled frequency:\t\t\t%u MHz\n",
+			nla_get_u32(sinfo[NL80211_SURVEY_INFO_FREQUENCY]));
+		return NL_SKIP;
+	}
+
+	add_survey(sinfo);
 
 	if (sinfo[NL80211_SURVEY_INFO_FREQUENCY])
 		printf("\tfrequency:\t\t\t%u MHz%s\n",
@@ -73,4 +114,25 @@ int handle_survey_dump(struct nl80211_state *state,
 {
 	nl_cb_set(cb, NL_CB_VALID, NL_CB_CUSTOM, print_survey_handler, NULL);
 	return 0;
+}
+
+void parse_survey_list(void)
+{
+	struct survey_item *item;
+	struct freq_survey *survey;
+
+	list_for_each_entry(item , &survey_list, list_member) {
+		survey = &item->survey;
+		printf("Freq: %d\n", survey->center_freq);
+	}
+}
+
+void clean_survey_list(void)
+{
+	struct survey_item *item, *tmp;
+
+	list_for_each_entry_safe(item , tmp, &survey_list, list_member) {
+		list_del_init(&item->list_member);
+		free(item);
+	}
 }

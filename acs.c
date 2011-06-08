@@ -238,7 +238,10 @@ int main(int argc, char **argv)
 	} else if (err < 0)
 		fprintf(stderr, "command failed: %s (%d)\n", strerror(-err), err);
 
+	parse_survey_list();
+
 	nl80211_cleanup(&nlstate);
+	clean_survey_list();
 
 	return err;
 }

@@ -8,6 +8,7 @@
 #include <netlink/genl/ctrl.h>
 
 #include "nl80211.h"
+#include "list.h"
 
 #define ETH_ALEN 6
 
@@ -53,6 +54,29 @@ struct cmd {
 		       int argc, char **argv);
 	const struct cmd *(*selector)(int argc, char **argv);
 	const struct cmd *parent;
+};
+
+/**
+ * struct survey_info - channel survey info
+ *
+ * @freq: center of frequency for the surveyed channel
+ * @noise: channel noise in dBm
+ * @channel_time: amount of time in ms the radio spent on the channel
+ * @channel_time_rx: amount of time the radio spent receiving data
+ * @channel_time_tx: amount of time the radio spent transmitting data
+ */
+struct freq_survey {
+	__u16 center_freq;
+	__u64 channel_time;
+	__u64 channel_time_busy;
+	__u64 channel_time_rx;
+	__u64 channel_time_tx;
+	__s8 noise;
+};
+
+struct survey_item {
+	struct freq_survey survey;
+	struct list_head list_member;
 };
 
 #define ARRAY_SIZE(ar) (sizeof(ar)/sizeof(ar[0]))
@@ -115,6 +139,8 @@ int handle_survey_dump(struct nl80211_state *state,
 		       struct nl_cb *cb,
 		       struct nl_msg *msg,
 		       int argc, char **argv);
+void parse_survey_list(void);
+void clean_survey_list(void);
 
 #define BIT(x) (1ULL<<(x))
 
