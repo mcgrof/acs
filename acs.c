@@ -131,27 +131,12 @@ static int ack_handler(struct nl_msg *msg, void *arg)
 	return NL_STOP;
 }
 
-static int init_acs(struct nl80211_state *state,
-		    int argc, char **argv)
+static int call_survey(struct nl80211_state *state, int devidx)
 {
 	struct nl_cb *cb;
 	struct nl_cb *s_cb;
 	struct nl_msg *msg;
-	int devidx = 0;
 	int err;
-
-	if (argc <= 0) {
-		return 1;
-	}
-
-	devidx = if_nametoindex(*argv);
-	if (devidx == 0)
-		devidx = -1;
-	argc--;
-	argv++;
-
-	if (devidx < 0)
-		return -errno;
 
 	msg = nlmsg_alloc();
 	if (!msg) {
@@ -173,7 +158,7 @@ static int init_acs(struct nl80211_state *state,
 
 	NLA_PUT_U32(msg, NL80211_ATTR_IFINDEX, devidx);
 
-	err = handle_survey_dump(state, cb, msg, argc, argv);
+	err = handle_survey_dump(state, cb);
 	if (err)
 		goto out;
 
@@ -204,6 +189,7 @@ static int init_acs(struct nl80211_state *state,
 int main(int argc, char **argv)
 {
 	struct nl80211_state nlstate;
+	int devidx = 0;
 	int err;
 
         /* strip off self */
@@ -231,7 +217,20 @@ int main(int argc, char **argv)
 	if (err)
 		return 1;
 
-	err = init_acs(&nlstate, argc, argv);
+	if (argc <= 0) {
+		return 1;
+	}
+
+	devidx = if_nametoindex(*argv);
+	if (devidx == 0)
+		devidx = -1;
+	argc--;
+	argv++;
+
+	if (devidx < 0)
+		return -errno;
+
+	err = call_survey(&nlstate, devidx);
 
 	if (err == 1) {
 		usage();

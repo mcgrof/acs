@@ -143,9 +143,7 @@ enum print_ie_type {
 };
 
 int handle_survey_dump(struct nl80211_state *state,
-		       struct nl_cb *cb,
-		       struct nl_msg *msg,
-		       int argc, char **argv);
+		       struct nl_cb *cb);
 void parse_freq_list(void);
 void clean_freq_list(void);
 
