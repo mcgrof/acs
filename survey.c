@@ -87,7 +87,7 @@ static int check_survey(struct nlattr **sinfo)
 	return 0;
 }
 
-static int print_survey_handler(struct nl_msg *msg, void *arg)
+int handle_survey_dump(struct nl_msg *msg, void *arg)
 {
 	struct nlattr *tb[NL80211_ATTR_MAX + 1];
 	struct genlmsghdr *gnlh = nlmsg_data(nlmsg_hdr(msg));
@@ -124,13 +124,6 @@ static int print_survey_handler(struct nl_msg *msg, void *arg)
 	add_survey(sinfo, ifidx);
 
 	return NL_SKIP;
-}
-
-int handle_survey_dump(struct nl80211_state *state,
-		       struct nl_cb *cb)
-{
-	nl_cb_set(cb, NL_CB_VALID, NL_CB_CUSTOM, print_survey_handler, NULL);
-	return 0;
 }
 
 static void parse_survey(struct freq_survey *survey, unsigned int id)

@@ -157,11 +157,7 @@ static int call_survey(struct nl80211_state *state, int devidx)
 		    NL80211_CMD_GET_SURVEY, 0);
 
 	NLA_PUT_U32(msg, NL80211_ATTR_IFINDEX, devidx);
-
-	err = handle_survey_dump(state, cb);
-	if (err)
-		goto out;
-
+	nl_cb_set(cb, NL_CB_VALID, NL_CB_CUSTOM, handle_survey_dump, NULL);
 	nl_socket_set_cb(state->nl_sock, s_cb);
 
 	err = nl_send_auto_complete(state->nl_sock, msg);

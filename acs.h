@@ -55,8 +55,8 @@ extern const char acs_version[];
 
 extern int nl_debug;
 
-int handle_survey_dump(struct nl80211_state *state,
-		       struct nl_cb *cb);
+int handle_survey_dump(struct nl_msg *msg, void *arg);
+
 void parse_freq_list(void);
 void clean_freq_list(void);
 
