@@ -131,7 +131,7 @@ static int ack_handler(struct nl_msg *msg, void *arg)
 	return NL_STOP;
 }
 
-static int call_survey(struct nl80211_state *state, int devidx)
+static int call_survey_freq(struct nl80211_state *state, int devidx, int freq)
 {
 	struct nl_cb *cb;
 	struct nl_cb *s_cb;
@@ -157,7 +157,7 @@ static int call_survey(struct nl80211_state *state, int devidx)
 		    NL80211_CMD_GET_SURVEY, 0);
 
 	NLA_PUT_U32(msg, NL80211_ATTR_IFINDEX, devidx);
-	nl_cb_set(cb, NL_CB_VALID, NL_CB_CUSTOM, handle_survey_dump, NULL);
+	nl_cb_set(cb, NL_CB_VALID, NL_CB_CUSTOM, handle_survey_dump, (void *) freq);
 	nl_socket_set_cb(state->nl_sock, s_cb);
 
 	err = nl_send_auto_complete(state->nl_sock, msg);
@@ -180,6 +180,21 @@ static int call_survey(struct nl80211_state *state, int devidx)
  nla_put_failure:
 	fprintf(stderr, "building message failed\n");
 	return 2;
+}
+
+/* Wants survey data from survey dump from all frequencies */
+static int call_survey(struct nl80211_state *state, int devidx)
+{
+	return call_survey_freq(state, devidx, 0);
+}
+
+/*
+ * Discards all survey data and simply uses the survey for frequency
+ * list gathering
+ */
+static int get_freq_list(struct nl80211_state *state, int devidx)
+{
+	return call_survey_freq(state, devidx, -1);
 }
 
 int main(int argc, char **argv)
@@ -226,6 +241,10 @@ int main(int argc, char **argv)
 
 	if (devidx < 0)
 		return -errno;
+
+	err = get_freq_list(&nlstate, devidx);
+	if (err)
+		return err;
 
 	while (surveys--) {
 		err = call_survey(&nlstate, devidx);

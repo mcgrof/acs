@@ -92,14 +92,17 @@ static int add_survey(struct nlattr **sinfo, __u32 ifidx)
 	return 0;
 }
 
-static int check_survey(struct nlattr **sinfo)
+static int check_survey(struct nlattr **sinfo, int freq_filter)
 {
 	struct freq_item *freq;
+	__u32 surveyed_freq;
 
 	if (!sinfo[NL80211_SURVEY_INFO_FREQUENCY]) {
 		fprintf(stderr, "bogus frequency!\n");
 		return NL_SKIP;
 	}
+
+	surveyed_freq = nla_get_u32(sinfo[NL80211_SURVEY_INFO_FREQUENCY]);
 
 	freq = get_freq_item(nla_get_u32(sinfo[NL80211_SURVEY_INFO_FREQUENCY]));
 	if (!freq)
@@ -111,6 +114,13 @@ static int check_survey(struct nlattr **sinfo)
 	    !sinfo[NL80211_SURVEY_INFO_CHANNEL_TIME_TX])
 		return NL_SKIP;
 
+	if (freq_filter) {
+		if (freq_filter == -1)
+			return NL_SKIP;
+		if (freq_filter != surveyed_freq)
+			return NL_SKIP;
+	}
+
 	return 0;
 }
 
@@ -120,12 +130,18 @@ int handle_survey_dump(struct nl_msg *msg, void *arg)
 	struct genlmsghdr *gnlh = nlmsg_data(nlmsg_hdr(msg));
 	struct nlattr *sinfo[NL80211_SURVEY_INFO_MAX + 1];
 	__u32 ifidx;
+	int freq;
 	int err;
 
 	static struct nla_policy survey_policy[NL80211_SURVEY_INFO_MAX + 1] = {
 		[NL80211_SURVEY_INFO_FREQUENCY] = { .type = NLA_U32 },
 		[NL80211_SURVEY_INFO_NOISE] = { .type = NLA_U8 },
 	};
+
+	if (!arg)
+		freq = 0;
+	else
+		freq = (int) arg;
 
 	nla_parse(tb, NL80211_ATTR_MAX, genlmsg_attrdata(gnlh, 0),
 		  genlmsg_attrlen(gnlh, 0), NULL);
@@ -144,7 +160,7 @@ int handle_survey_dump(struct nl_msg *msg, void *arg)
 		return NL_SKIP;
 	}
 
-	err = check_survey(sinfo);
+	err = check_survey(sinfo, freq);
 	if (err != 0)
 		return err;
 
