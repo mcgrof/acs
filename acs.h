@@ -30,12 +30,17 @@ struct nl80211_state {
 struct freq_item {
 	__u16 center_freq;
 	bool enabled;
+	__s8 max_noise;
+	__s8 min_noise;
+	/* An alternative is to use__float128 for low noise environments */
+	long long unsigned int interference_factor;
 	struct list_head list_member;
 	struct list_head survey_list;
 };
 
 int handle_survey_dump(struct nl_msg *msg, void *arg);
 void parse_freq_list(void);
+void parse_freq_int_factor(void);
 void annotate_enabled_chans(void);
 void clean_freq_list(void);
 void clear_freq_surveys(void);

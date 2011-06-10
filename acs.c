@@ -227,7 +227,7 @@ static int go_offchan_freq(struct nl80211_state *state, int devidx, int freq)
 	NLA_PUT_U32(msg, NL80211_ATTR_IFINDEX, devidx);
 	NLA_PUT_U32(msg, NL80211_ATTR_WIPHY_FREQ, freq);
 	/* 5 seconds is the max allowed, values passed are in ms */
-	NLA_PUT_U32(msg, NL80211_ATTR_DURATION, 5000);
+	NLA_PUT_U32(msg, NL80211_ATTR_DURATION, 5);
 
 	nl_socket_set_cb(state->nl_sock, s_cb);
 
@@ -305,7 +305,7 @@ int main(int argc, char **argv)
 	struct nl80211_state nlstate;
 	int devidx = 0;
 	int err;
-	unsigned int surveys = 1;
+	unsigned int surveys = 10;
 
         /* strip off self */
 	argc--;
@@ -360,6 +360,7 @@ int main(int argc, char **argv)
 	}
 
 	parse_freq_list();
+	parse_freq_int_factor();
 
 	nl80211_cleanup(&nlstate);
 	clear_offchan_ops_list();

@@ -12,6 +12,7 @@
 #include "acs.h"
 
 LIST_HEAD(freq_list);
+__s8 lowest_noise = 100;
 
 /**
  * struct survey_info - channel survey info
@@ -19,8 +20,18 @@ LIST_HEAD(freq_list);
  * @freq: center of frequency for the surveyed channel
  * @noise: channel noise in dBm
  * @channel_time: amount of time in ms the radio spent on the channel
+ * @channel_time_busy: amount of time in ms the radio detected some signal
+ *	that indicated to the radio the channel was not clear
  * @channel_time_rx: amount of time the radio spent receiving data
  * @channel_time_tx: amount of time the radio spent transmitting data
+ * @interference_factor: computed interference factor observed on this
+ *	channel. This is defined as the ratio of the observed busy time
+ *	over the time we spent on the channel, this value is then
+ * 	amplified by the noise based on the lowest and highest observed
+ * 	noise value on the same frequency. This corresponds to:
+ *	---
+ *	(busy time - tx time) / (active time - tx time) * 3^(noise + min_noise)
+ *	---
  */
 struct freq_survey {
 	__u32 ifidx;
@@ -30,6 +41,8 @@ struct freq_survey {
 	__u64 channel_time_rx;
 	__u64 channel_time_tx;
 	__s8 noise;
+	/* An alternative is to use__float128 for low noise environments */
+	long long unsigned int interference_factor;
 	struct list_head list_member;
 };
 
@@ -79,6 +92,15 @@ static int add_survey(struct nlattr **sinfo, __u32 ifidx)
 		free(survey);
 		return -ENOMEM;
 	}
+
+	if (freq->max_noise < survey->noise)
+		freq->max_noise = survey ->noise;
+
+	if (freq->min_noise > survey->noise)
+		freq->min_noise = survey->noise;
+
+	if (lowest_noise > survey->noise)
+		lowest_noise = survey->noise;
 
 	list_add(&survey->list_member, &freq->survey_list);
 
@@ -162,11 +184,42 @@ int handle_survey_dump(struct nl_msg *msg, void *arg)
 	return NL_SKIP;
 }
 
+static __u64 three_to_power(__u64 pow)
+{
+	__u64 result = 3;
+
+	if (pow == 0)
+		return 1;
+
+	pow--;
+	while (pow--)
+	result *= 3;
+
+	return result;
+}
+
+static long double compute_interference_factor(struct freq_survey *survey, __s8 min_noise)
+{
+	long double factor;
+
+	factor = survey->channel_time_busy - survey->channel_time_tx;
+	factor /= (survey->channel_time - survey->channel_time_tx);
+	factor *= (three_to_power(survey->noise - min_noise));
+
+	survey->interference_factor = factor;
+
+	return factor;
+}
+
+#ifdef VERBOSE
 static void parse_survey(struct freq_survey *survey, unsigned int id)
 {
 	char dev[20];
 
 	if_indextoname(survey->ifidx, dev);
+
+	if (id == 1)
+		printf("\n");
 
 	printf("Survey %d from %s:\n", id, dev);
 
@@ -180,24 +233,36 @@ static void parse_survey(struct freq_survey *survey, unsigned int id)
 	       (unsigned long long) survey->channel_time_rx);
 	printf("\tchannel transmit time:\t\t%llu ms\n",
 	       (unsigned long long) survey->channel_time_tx);
+	printf("\tinterference factor:\t\t%lld\n", survey->interference_factor);
 }
+#else
+static void parse_survey(struct freq_survey *survey, unsigned int id)
+{
+	printf("%lld ", survey->interference_factor);
+}
+#endif
 
 static void parse_freq(struct freq_item *freq)
 {
 	struct freq_survey *survey;
 	unsigned int i = 0;
+	long long unsigned int int_factor = 0, sum = 0;
 
-	if (list_empty(&freq->survey_list) || !freq->enabled) {
-		printf("Unsurveyed Freq: %d MHz\n", freq->center_freq);
+	if (list_empty(&freq->survey_list) || !freq->enabled)
 		return;
-	}
 
-	printf("Survey results for Freq: %d MHz\n", freq->center_freq);
+	printf("Results for %d MHz: ", freq->center_freq);
 
-	list_for_each_entry(survey, &freq->survey_list, list_member)
+	list_for_each_entry(survey, &freq->survey_list, list_member) {
+		int_factor = compute_interference_factor(survey, lowest_noise);
+		sum = freq->interference_factor + int_factor;
+		freq->interference_factor = sum;
 		parse_survey(survey, ++i);
+	}
+	printf("\n");
 }
 
+/* At this point its assumed we have the min_noise */
 void parse_freq_list(void)
 {
 	struct freq_item *freq;
@@ -205,6 +270,27 @@ void parse_freq_list(void)
 	list_for_each_entry(freq, &freq_list, list_member) {
 		parse_freq(freq);
 	}
+}
+
+void parse_freq_int_factor(void)
+{
+	struct freq_item *freq, *ideal_freq = NULL;
+
+	list_for_each_entry(freq, &freq_list, list_member) {
+		if (list_empty(&freq->survey_list) || !freq->enabled) {
+			continue;
+		}
+
+		printf("%d MHz: %lld\n", freq->center_freq, freq->interference_factor);
+
+		if (!ideal_freq)
+			ideal_freq = freq;
+		else {
+			if (freq->interference_factor < ideal_freq->interference_factor)
+				ideal_freq = freq;
+		}
+	}
+	printf("Ideal freq: %d MHz\n", ideal_freq->center_freq);
 }
 
 void annotate_enabled_chans(void)
