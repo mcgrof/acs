@@ -17,6 +17,7 @@ CFLAGS += -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs -fno-strict-aliasing 
 OBJS = acs.o \
 	genl.o \
 	survey.o \
+	event.o \
 	version.o
 ALL = acs 
 

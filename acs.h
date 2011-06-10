@@ -29,13 +29,24 @@ struct nl80211_state {
 
 struct freq_item {
 	__u16 center_freq;
+	bool enabled;
 	struct list_head list_member;
 	struct list_head survey_list;
 };
 
 int handle_survey_dump(struct nl_msg *msg, void *arg);
 void parse_freq_list(void);
+void annotate_enabled_chans(void);
 void clean_freq_list(void);
+void clear_freq_surveys(void);
+__u32 wait_for_offchan_op(struct nl80211_state *state,
+			  int devidx, int freq,
+			  const int n_waits, const __u32 *waits);
+void clear_offchan_ops_list(void);
+
+int nl_get_multicast_id(struct nl_sock *sock, const char *family, const char *group);
+
+int nl80211_add_membership_mlme(struct nl80211_state *state);
 
 extern const char acs_version[];
 extern int nl_debug;

@@ -14,6 +14,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <unistd.h>
                      
 #include <netlink/genl/genl.h>
 #include <netlink/genl/family.h>
@@ -131,6 +132,22 @@ static int ack_handler(struct nl_msg *msg, void *arg)
 	return NL_STOP;
 }
 
+static int wait_for_offchannel(struct nl80211_state *state,
+			       int devidx, int freq)
+{
+	int err;
+	static const __u32 cmds[] = {
+		NL80211_CMD_REMAIN_ON_CHANNEL,
+		NL80211_CMD_CANCEL_REMAIN_ON_CHANNEL,
+	};
+
+	err = wait_for_offchan_op(state, devidx, freq, ARRAY_SIZE(cmds), cmds);
+	if (err)
+		return err;
+
+	return 0;
+}
+
 static int call_survey_freq(struct nl80211_state *state, int devidx, int freq)
 {
 	struct nl_cb *cb;
@@ -182,13 +199,78 @@ static int call_survey_freq(struct nl80211_state *state, int devidx, int freq)
 	return 2;
 }
 
+static int go_offchan_freq(struct nl80211_state *state, int devidx, int freq)
+{
+	struct nl_cb *cb;
+	struct nl_cb *s_cb;
+	struct nl_msg *msg;
+	int err;
+
+	msg = nlmsg_alloc();
+	if (!msg) {
+		fprintf(stderr, "failed to allocate netlink message\n");
+		return 2;
+	}
+
+	cb = nl_cb_alloc(nl_debug ? NL_CB_DEBUG : NL_CB_DEFAULT);
+	s_cb = nl_cb_alloc(nl_debug ? NL_CB_DEBUG : NL_CB_DEFAULT);
+	if (!cb || !s_cb) {
+		fprintf(stderr, "failed to allocate netlink callbacks\n");
+		err = 2;
+		goto out_free_msg;
+	}
+
+	genlmsg_put(msg, 0, 0, genl_family_get_id(state->nl80211), 0,
+		    0,
+		    NL80211_CMD_REMAIN_ON_CHANNEL, 0);
+
+	NLA_PUT_U32(msg, NL80211_ATTR_IFINDEX, devidx);
+	NLA_PUT_U32(msg, NL80211_ATTR_WIPHY_FREQ, freq);
+	/* 5 seconds is the max allowed, values passed are in ms */
+	NLA_PUT_U32(msg, NL80211_ATTR_DURATION, 5000);
+
+	nl_socket_set_cb(state->nl_sock, s_cb);
+
+	err = nl_send_auto_complete(state->nl_sock, msg);
+	if (err < 0)
+		goto out;
+
+	err = 1;
+
+	nl_cb_err(cb, NL_CB_CUSTOM, error_handler, &err);
+	nl_cb_set(cb, NL_CB_FINISH, NL_CB_CUSTOM, finish_handler, &err);
+	nl_cb_set(cb, NL_CB_ACK, NL_CB_CUSTOM, ack_handler, &err);
+
+	while (err > 0)
+		nl_recvmsgs(state->nl_sock, cb);
+ out:
+	nl_cb_put(cb);
+ out_free_msg:
+	nlmsg_free(msg);
+	return err;
+ nla_put_failure:
+	fprintf(stderr, "building message failed\n");
+	return 2;
+}
+
+
 /*
- * Discards all survey data and simply uses the survey for frequency
- * list gathering
+ * Does a full survey on all channels. Since drivers will only
+ * return survey data for channels they are allowed on we will
+ * disregard further study on any channels we did not get any
+ * survey data on.
  */
 static int get_freq_list(struct nl80211_state *state, int devidx)
 {
-	return call_survey_freq(state, devidx, -1);
+	int err;
+
+	err = call_survey_freq(state, devidx, 0);
+	if (err)
+		return err;
+	annotate_enabled_chans();
+	clear_freq_surveys();
+
+	return 0;
 }
 
 /* Studies all frequencies known */
@@ -197,8 +279,19 @@ static int study_freqs(struct nl80211_state *state, int devidx)
 	int err;
 	struct freq_item *freq;
 
+	err = nl80211_add_membership_mlme(state);
+	if (err)
+		return err;
+
 	list_for_each_entry(freq, &freq_list, list_member) {
-		/* XXX: switch to the frequency for a while */
+		if (!freq->enabled)
+			continue;
+		err = go_offchan_freq(state, devidx, freq->center_freq);
+		if (err)
+			return err;
+		err = wait_for_offchannel(state, devidx, freq->center_freq);
+		if (err)
+			return err;
 		err = call_survey_freq(state, devidx, freq->center_freq);
 		if (err)
 			return err;
@@ -212,7 +305,7 @@ int main(int argc, char **argv)
 	struct nl80211_state nlstate;
 	int devidx = 0;
 	int err;
-	unsigned int surveys = 10;
+	unsigned int surveys = 1;
 
         /* strip off self */
 	argc--;
@@ -252,6 +345,10 @@ int main(int argc, char **argv)
 	if (devidx < 0)
 		return -errno;
 
+	/*
+	 * XXX: we should probably get channel list properly here
+	 * but I'm lazy.
+	 */
 	err = get_freq_list(&nlstate, devidx);
 	if (err)
 		return err;
@@ -265,6 +362,7 @@ int main(int argc, char **argv)
 	parse_freq_list();
 
 	nl80211_cleanup(&nlstate);
+	clear_offchan_ops_list();
 	clean_freq_list();
 
 	return err;

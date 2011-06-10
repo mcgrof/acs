@@ -187,7 +187,7 @@ static void parse_freq(struct freq_item *freq)
 	struct freq_survey *survey;
 	unsigned int i = 0;
 
-	if (list_empty(&freq->survey_list)) {
+	if (list_empty(&freq->survey_list) || !freq->enabled) {
 		printf("Unsurveyed Freq: %d MHz\n", freq->center_freq);
 		return;
 	}
@@ -207,6 +207,15 @@ void parse_freq_list(void)
 	}
 }
 
+void annotate_enabled_chans(void)
+{
+	struct freq_item *freq;
+
+	list_for_each_entry(freq, &freq_list, list_member)
+		if (!list_empty(&freq->survey_list))
+			freq->enabled = true;
+}
+
 static void clean_freq_survey(struct freq_item *freq)
 {
 	struct freq_survey *survey, *tmp;
@@ -217,13 +226,25 @@ static void clean_freq_survey(struct freq_item *freq)
 	}
 }
 
-void clean_freq_list(void)
+static void __clean_freq_list(bool clear_freqs)
 {
 	struct freq_item *freq, *tmp;
 
 	list_for_each_entry_safe(freq, tmp, &freq_list, list_member) {
-		list_del_init(&freq->list_member);
+		if (clear_freqs)
+			list_del_init(&freq->list_member);
 		clean_freq_survey(freq);
-		free(freq);
+		if (clear_freqs)
+			free(freq);
 	}
+}
+
+void clean_freq_list(void)
+{
+	__clean_freq_list(true);
+}
+
+void clear_freq_surveys(void)
+{
+	__clean_freq_list(false);
 }
