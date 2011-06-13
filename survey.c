@@ -200,7 +200,7 @@ static __u64 base_to_power(__u64 base, __u64 pow)
 
 	pow--;
 	while (pow--)
-	result *= base;
+		result *= base;
 
 	return result;
 }
