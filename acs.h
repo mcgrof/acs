@@ -32,8 +32,8 @@ struct freq_item {
 	bool enabled;
 	__s8 max_noise;
 	__s8 min_noise;
-	/* An alternative is to use__float128 for low noise environments */
-	long long unsigned int interference_factor;
+	/* An alternative is to use __float128 for low noise environments */
+	long double interference_factor;
 	struct list_head list_member;
 	struct list_head survey_list;
 };

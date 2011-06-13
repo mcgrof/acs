@@ -29,9 +29,15 @@ __s8 lowest_noise = 100;
  *	over the time we spent on the channel, this value is then
  * 	amplified by the noise based on the lowest and highest observed
  * 	noise value on the same frequency. This corresponds to:
+ *
  *	---
- *	(busy time - tx time) / (active time - tx time) * 3^(noise + min_noise)
+ *	(busy time - tx time) / (active time - tx time) * 2^(noise + min_noise)
  *	---
+ *
+ *	The coefficient of of 2 reflects the way power in "far-field" radiation
+ *	decreases as the square of distance from the antenna [1].
+ *
+ *	[1] http://en.wikipedia.org/wiki/Near_and_far_field
  */
 struct freq_survey {
 	__u32 ifidx;
@@ -42,7 +48,7 @@ struct freq_survey {
 	__u64 channel_time_tx;
 	__s8 noise;
 	/* An alternative is to use__float128 for low noise environments */
-	long long unsigned int interference_factor;
+	long double interference_factor;
 	struct list_head list_member;
 };
 
@@ -184,16 +190,16 @@ int handle_survey_dump(struct nl_msg *msg, void *arg)
 	return NL_SKIP;
 }
 
-static __u64 three_to_power(__u64 pow)
+static __u64 base_to_power(__u64 base, __u64 pow)
 {
-	__u64 result = 3;
+	__u64 result = base;
 
 	if (pow == 0)
 		return 1;
 
 	pow--;
 	while (pow--)
-	result *= 3;
+	result *= base;
 
 	return result;
 }
@@ -204,7 +210,7 @@ static long double compute_interference_factor(struct freq_survey *survey, __s8 
 
 	factor = survey->channel_time_busy - survey->channel_time_tx;
 	factor /= (survey->channel_time - survey->channel_time_tx);
-	factor *= (three_to_power(survey->noise - min_noise));
+	factor *= (base_to_power(2, survey->noise - min_noise));
 
 	survey->interference_factor = factor;
 
@@ -233,12 +239,12 @@ static void parse_survey(struct freq_survey *survey, unsigned int id)
 	       (unsigned long long) survey->channel_time_rx);
 	printf("\tchannel transmit time:\t\t%llu ms\n",
 	       (unsigned long long) survey->channel_time_tx);
-	printf("\tinterference factor:\t\t%lld\n", survey->interference_factor);
+	printf("\tinterference factor:\t\t%Lf\n", survey->interference_factor);
 }
 #else
 static void parse_survey(struct freq_survey *survey, unsigned int id)
 {
-	printf("%lld ", survey->interference_factor);
+	printf("%Lf ", survey->interference_factor);
 }
 #endif
 
@@ -246,7 +252,7 @@ static void parse_freq(struct freq_item *freq)
 {
 	struct freq_survey *survey;
 	unsigned int i = 0;
-	long long unsigned int int_factor = 0, sum = 0;
+	long double int_factor = 0, sum = 0;
 
 	if (list_empty(&freq->survey_list) || !freq->enabled)
 		return;
@@ -281,7 +287,7 @@ void parse_freq_int_factor(void)
 			continue;
 		}
 
-		printf("%d MHz: %lld\n", freq->center_freq, freq->interference_factor);
+		printf("%d MHz: %Lf\n", freq->center_freq, freq->interference_factor);
 
 		if (!ideal_freq)
 			ideal_freq = freq;
