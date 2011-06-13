@@ -16,6 +16,8 @@
 #include <stdbool.h>
 #include <unistd.h>
                      
+#include <sys/ioctl.h>
+
 #include <netlink/genl/genl.h>
 #include <netlink/genl/family.h>
 #include <netlink/genl/ctrl.h>  
@@ -300,10 +302,52 @@ static int study_freqs(struct nl80211_state *state, int devidx)
 	return 0;
 }
 
+static int get_ctl_fd(void)
+{
+	int fd;
+
+	fd = socket(PF_INET, SOCK_DGRAM, 0);
+	if (fd >= 0)
+		return fd;
+
+	fd = socket(PF_PACKET, SOCK_DGRAM, 0);
+	if (fd >= 0)
+		return fd;
+
+	fd = socket(PF_INET6, SOCK_DGRAM, 0);
+	if (fd >= 0)
+		return fd;
+
+	return -1;
+}
+
+
+static bool is_link_up(char *devname)
+{
+	struct ifreq ifr;
+	int fd;
+	int err;
+
+	strncpy(ifr.ifr_name, devname, IFNAMSIZ);
+	fd = get_ctl_fd();
+	if (fd < 0)
+		return false;
+	err = ioctl(fd, SIOCGIFFLAGS, &ifr);
+	if (err) {
+		close(fd);
+		return false;
+	}
+	if (ifr.ifr_flags & IFF_UP)
+		return true;
+
+	return false;
+}
+
 int main(int argc, char **argv)
 {
 	struct nl80211_state nlstate;
 	int devidx = 0;
+	char *devname;
 	int err;
 	unsigned int surveys = 10;
 
@@ -339,11 +383,19 @@ int main(int argc, char **argv)
 	devidx = if_nametoindex(*argv);
 	if (devidx == 0)
 		devidx = -1;
+
+	devname = *argv;
 	argc--;
 	argv++;
 
 	if (devidx < 0)
 		return -errno;
+
+	if (!is_link_up(devname)) {
+		err = -ENOLINK;
+		printf("Link for %s must be up to use acs\n", devname);
+		goto nl_cleanup;
+	}
 
 	/*
 	 * XXX: we should probably get channel list properly here
@@ -362,6 +414,7 @@ int main(int argc, char **argv)
 	parse_freq_list();
 	parse_freq_int_factor();
 
+nl_cleanup:
 	nl80211_cleanup(&nlstate);
 	clear_offchan_ops_list();
 	clean_freq_list();
