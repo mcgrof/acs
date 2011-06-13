@@ -58,7 +58,7 @@ static struct freq_item *get_freq_item(__u16 center_freq)
 	freq = (struct freq_item*) malloc(sizeof(struct freq_item));
 	if (!freq)
 		return NULL;
-	memset(freq, 0, sizeof(freq));
+	memset(freq, 0, sizeof(struct freq_item));
 
 	freq->center_freq = center_freq;
 	INIT_LIST_HEAD(&freq->survey_list);
@@ -75,7 +75,7 @@ static int add_survey(struct nlattr **sinfo, __u32 ifidx)
 	survey = (struct freq_survey*) malloc(sizeof(struct freq_survey));
 	if  (!survey)
 		return -ENOMEM;
-	memset(survey, 0, sizeof(survey));
+	memset(survey, 0, sizeof(struct freq_survey));
 
 	INIT_LIST_HEAD(&survey->list_member);
 
