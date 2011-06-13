@@ -258,7 +258,7 @@ static void parse_freq(struct freq_item *freq)
 	if (list_empty(&freq->survey_list) || !freq->enabled)
 		return;
 
-	printf("%5d surveys for %d MHz", freq->survey_count, freq->center_freq);
+	printf("%5d surveys for %d MHz: ", freq->survey_count, freq->center_freq);
 
 	list_for_each_entry(survey, &freq->survey_list, list_member) {
 		int_factor = compute_interference_factor(survey, lowest_noise);
