@@ -35,6 +35,7 @@ struct freq_item {
 	/* An alternative is to use __float128 for low noise environments */
 	long double interference_factor;
 	struct list_head list_member;
+	unsigned int survey_count;
 	struct list_head survey_list;
 };
 

@@ -109,6 +109,7 @@ static int add_survey(struct nlattr **sinfo, __u32 ifidx)
 		lowest_noise = survey->noise;
 
 	list_add(&survey->list_member, &freq->survey_list);
+	freq->survey_count++;
 
 	return 0;
 }
@@ -257,7 +258,7 @@ static void parse_freq(struct freq_item *freq)
 	if (list_empty(&freq->survey_list) || !freq->enabled)
 		return;
 
-	printf("Results for %d MHz: ", freq->center_freq);
+	printf("%5d surveys for %d MHz", freq->survey_count, freq->center_freq);
 
 	list_for_each_entry(survey, &freq->survey_list, list_member) {
 		int_factor = compute_interference_factor(survey, lowest_noise);
@@ -265,6 +266,9 @@ static void parse_freq(struct freq_item *freq)
 		freq->interference_factor = sum;
 		parse_survey(survey, ++i);
 	}
+
+	freq->interference_factor = freq->interference_factor / freq->survey_count;
+
 	printf("\n");
 }
 
@@ -314,6 +318,7 @@ static void clean_freq_survey(struct freq_item *freq)
 
 	list_for_each_entry_safe(survey, tmp, &freq->survey_list, list_member) {
 		list_del_init(&survey->list_member);
+		freq->survey_count--;
 		free(survey);
 	}
 }
