@@ -176,7 +176,7 @@ static int call_survey_freq(struct nl80211_state *state, int devidx, int freq)
 		    NL80211_CMD_GET_SURVEY, 0);
 
 	NLA_PUT_U32(msg, NL80211_ATTR_IFINDEX, devidx);
-	nl_cb_set(cb, NL_CB_VALID, NL_CB_CUSTOM, handle_survey_dump, (void *) freq);
+	nl_cb_set(cb, NL_CB_VALID, NL_CB_CUSTOM, handle_survey_dump, (void *) &freq);
 	nl_socket_set_cb(state->nl_sock, s_cb);
 
 	err = nl_send_auto_complete(state->nl_sock, msg);

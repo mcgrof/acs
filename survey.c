@@ -153,6 +153,7 @@ int handle_survey_dump(struct nl_msg *msg, void *arg)
 	struct nlattr *sinfo[NL80211_SURVEY_INFO_MAX + 1];
 	__u32 ifidx;
 	int freq;
+	int *pfreq = NULL;
 	int err;
 
 	static struct nla_policy survey_policy[NL80211_SURVEY_INFO_MAX + 1] = {
@@ -162,8 +163,10 @@ int handle_survey_dump(struct nl_msg *msg, void *arg)
 
 	if (!arg)
 		freq = 0;
-	else
-		freq = (int) arg;
+	else {
+		pfreq = (int *) arg;
+		freq = *pfreq;
+	}
 
 	nla_parse(tb, NL80211_ATTR_MAX, genlmsg_attrdata(gnlh, 0),
 		  genlmsg_attrlen(gnlh, 0), NULL);
