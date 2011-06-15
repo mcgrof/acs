@@ -19,7 +19,7 @@
 #  define nl_sock nl_handle
 #endif
 
-extern struct list_head freq_list;
+extern struct dl_list freq_list;
 
 struct nl80211_state {
 	struct nl_sock *nl_sock;
@@ -34,9 +34,9 @@ struct freq_item {
 	__s8 min_noise;
 	/* An alternative is to use __float128 for low noise environments */
 	long double interference_factor;
-	struct list_head list_member;
+	struct dl_list list_member;
 	unsigned int survey_count;
-	struct list_head survey_list;
+	struct dl_list survey_list;
 };
 
 int handle_survey_dump(struct nl_msg *msg, void *arg);

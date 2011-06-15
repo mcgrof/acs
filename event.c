@@ -4,7 +4,10 @@
 #include <errno.h>
 #include "acs.h"
 
-static LIST_HEAD(offchan_ops_list);
+struct dl_list offchan_ops_list = {
+        (&offchan_ops_list),
+        (&offchan_ops_list),
+};
 
 struct offchan_ev {
 	int ifidx;
@@ -22,7 +25,7 @@ struct wait_event {
 
 struct offchan_op {
 	struct offchan_ev ev;
-	struct list_head list_member;
+	struct dl_list list_member;
 };
 
 static int no_seq_check(struct nl_msg *msg, void *arg)
@@ -105,18 +108,18 @@ static int wait_sanity_check(struct nl_msg *msg, struct wait_event *wait)
 			       (unsigned long long) op_now.ev.cookie);
 		}
 
-		list_add_tail(&op->list_member, &offchan_ops_list);
+		dl_list_add_tail(&offchan_ops_list, &op->list_member);
 
 		break;
 	case NL80211_CMD_CANCEL_REMAIN_ON_CHANNEL:
-		list_for_each_entry_safe(op, tmp, &offchan_ops_list, list_member) {
+		dl_list_for_each_safe(op, tmp, &offchan_ops_list, struct offchan_op, list_member) {
 			if (!offchan_ops_match(op, &op_now))
 				continue;
 			if (wait->ev.cookie == op->ev.cookie) {
 				wait->completed = true;
 				printf("yes\n");
 			}
-			list_del_init(&op->list_member);
+			dl_list_del(&op->list_member);
 			free(op);
 		}
 		break;
@@ -195,8 +198,8 @@ void clear_offchan_ops_list(void)
 {
 	struct offchan_op *op, *tmp;
 
-	list_for_each_entry_safe(op, tmp, &offchan_ops_list, list_member) {
-		list_del_init(&op->list_member);
+	dl_list_for_each_safe(op, tmp, &offchan_ops_list, struct offchan_op, list_member) {
+		dl_list_del(&op->list_member);
 		free(op);
 	}
 }

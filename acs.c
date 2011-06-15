@@ -285,7 +285,7 @@ static int study_freqs(struct nl80211_state *state, int devidx)
 	if (err)
 		return err;
 
-	list_for_each_entry(freq, &freq_list, list_member) {
+	dl_list_for_each(freq, &freq_list, struct freq_item, list_member) {
 		if (!freq->enabled)
 			continue;
 		err = go_offchan_freq(state, devidx, freq->center_freq);
@@ -399,7 +399,8 @@ int main(int argc, char **argv)
 
 	/*
 	 * XXX: we should probably get channel list properly here
-	 * but I'm lazy.
+	 * but I'm lazy. THIS IS A REQUIREMENT, given that if a device
+	 * is down and comes up we won't have any survey data to study.
 	 */
 	err = get_freq_list(&nlstate, devidx);
 	if (err)

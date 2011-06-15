@@ -12,7 +12,11 @@
 #include "nl80211.h"
 #include "acs.h"
 
-LIST_HEAD(freq_list);
+struct dl_list freq_list = {
+	(&freq_list),
+	(&freq_list),
+};
+
 __s8 lowest_noise = 100;
 
 /**
@@ -109,14 +113,14 @@ struct freq_survey {
 	__s8 noise;
 	/* An alternative is to use__float128 for low noise environments */
 	long double interference_factor;
-	struct list_head list_member;
+	struct dl_list list_member;
 };
 
 static struct freq_item *get_freq_item(__u16 center_freq)
 {
 	struct freq_item *freq;
 
-	list_for_each_entry(freq, &freq_list, list_member) {
+	dl_list_for_each(freq, &freq_list, struct freq_item, list_member) {
 		if (freq->center_freq == center_freq)
 			return freq;
 	}
@@ -127,8 +131,8 @@ static struct freq_item *get_freq_item(__u16 center_freq)
 	memset(freq, 0, sizeof(struct freq_item));
 
 	freq->center_freq = center_freq;
-	INIT_LIST_HEAD(&freq->survey_list);
-	list_add_tail(&freq->list_member, &freq_list);
+	dl_list_init(&freq->survey_list);
+	dl_list_add_tail(&freq_list, &freq->list_member);
 
 	return freq;
 }
@@ -142,8 +146,6 @@ static int add_survey(struct nlattr **sinfo, __u32 ifidx)
 	if  (!survey)
 		return -ENOMEM;
 	memset(survey, 0, sizeof(struct freq_survey));
-
-	INIT_LIST_HEAD(&survey->list_member);
 
 	survey->ifidx = ifidx;
 	survey->noise = (int8_t) nla_get_u8(sinfo[NL80211_SURVEY_INFO_NOISE]);
@@ -168,7 +170,7 @@ static int add_survey(struct nlattr **sinfo, __u32 ifidx)
 	if (lowest_noise > survey->noise)
 		lowest_noise = survey->noise;
 
-	list_add(&survey->list_member, &freq->survey_list);
+	dl_list_add_tail(&freq->survey_list, &survey->list_member);
 	freq->survey_count++;
 
 	return 0;
@@ -319,12 +321,12 @@ static void parse_freq(struct freq_item *freq)
 	unsigned int i = 0;
 	long double int_factor = 0, sum = 0;
 
-	if (list_empty(&freq->survey_list) || !freq->enabled)
+	if (dl_list_empty(&freq->survey_list) || !freq->enabled)
 		return;
 
 	printf("%5d surveys for %d MHz: ", freq->survey_count, freq->center_freq);
 
-	list_for_each_entry(survey, &freq->survey_list, list_member) {
+	dl_list_for_each(survey, &freq->survey_list, struct freq_survey, list_member) {
 		int_factor = compute_interference_factor(survey, lowest_noise);
 		sum = freq->interference_factor + int_factor;
 		freq->interference_factor = sum;
@@ -341,7 +343,7 @@ void parse_freq_list(void)
 {
 	struct freq_item *freq;
 
-	list_for_each_entry(freq, &freq_list, list_member) {
+	dl_list_for_each(freq, &freq_list, struct freq_item, list_member) {
 		parse_freq(freq);
 	}
 }
@@ -350,8 +352,8 @@ void parse_freq_int_factor(void)
 {
 	struct freq_item *freq, *ideal_freq = NULL;
 
-	list_for_each_entry(freq, &freq_list, list_member) {
-		if (list_empty(&freq->survey_list) || !freq->enabled) {
+	dl_list_for_each(freq, &freq_list, struct freq_item, list_member) {
+		if (dl_list_empty(&freq->survey_list) || !freq->enabled) {
 			continue;
 		}
 
@@ -371,8 +373,8 @@ void annotate_enabled_chans(void)
 {
 	struct freq_item *freq;
 
-	list_for_each_entry(freq, &freq_list, list_member)
-		if (!list_empty(&freq->survey_list))
+	dl_list_for_each(freq, &freq_list, struct freq_item, list_member)
+		if (!dl_list_empty(&freq->survey_list))
 			freq->enabled = true;
 }
 
@@ -380,8 +382,8 @@ static void clean_freq_survey(struct freq_item *freq)
 {
 	struct freq_survey *survey, *tmp;
 
-	list_for_each_entry_safe(survey, tmp, &freq->survey_list, list_member) {
-		list_del_init(&survey->list_member);
+	dl_list_for_each_safe(survey, tmp, &freq->survey_list, struct freq_survey, list_member) {
+		dl_list_del(&survey->list_member);
 		freq->survey_count--;
 		free(survey);
 	}
@@ -391,9 +393,9 @@ static void __clean_freq_list(bool clear_freqs)
 {
 	struct freq_item *freq, *tmp;
 
-	list_for_each_entry_safe(freq, tmp, &freq_list, list_member) {
+	dl_list_for_each_safe(freq, tmp, &freq_list, struct freq_item, list_member) {
 		if (clear_freqs)
-			list_del_init(&freq->list_member);
+			dl_list_del(&freq->list_member);
 		clean_freq_survey(freq);
 		if (clear_freqs)
 			free(freq);
