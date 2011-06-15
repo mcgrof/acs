@@ -1,6 +1,7 @@
 #include <net/if.h>
 #include <errno.h>
 #include <string.h>
+#include <math.h>
 
 #include <netlink/genl/genl.h>
 #include <netlink/genl/family.h>
@@ -35,7 +36,66 @@ __s8 lowest_noise = 100;
  *	---
  *
  *	The coefficient of of 2 reflects the way power in "far-field" radiation
- *	decreases as the square of distance from the antenna [1].
+ *	decreases as the square of distance from the antenna [1]. What this does
+ *	is it decreases the observed busy time ratio if the noise observed was
+ *	low but increases it if the noise was high, proportionally to the way
+ *	"far field" radiation changes over distance. Since the values obtained
+ * 	here can vary from fractional to millions the sane thing to do here is
+ *	to use log2() to reflect the observed interference factor. log2() values
+ *	less than 0 then represent fractional results, while > 1 values non-fractional
+ *	results. The computation of the interference factor then becomes:
+
+ *	---
+ *	log2( (busy time - tx time) / (active time - tx time) * 2^(noise + min_noise))
+ *	--- or due to logarithm identities:
+ *	log2(busy time - tx time) - log2(active time - tx time) + log2(2^(noise + min_noise))
+ *	---
+ *
+ *	All this is "interference factor" is purely subjective and ony time will tell how
+ *	usable this is. By using the minimum noise floor we remove any possible issues
+ *	due to card calibration. The computation of the interference factor then is
+ *	dependent on what the card itself picks up as the minimum noise, not an actual
+ *	real possible card noise value.
+ *
+ *	Example output:
+ *
+ *	2412 MHz: 7.429173
+ *	2417 MHz: 10.460830
+ *	2422 MHz: 12.671070
+ *	2427 MHz: 13.583892
+ *	2432 MHz: 13.405357
+ *	2442 MHz: 13.566887
+ *	2447 MHz: 15.630824
+ *	2452 MHz: 14.639748
+ *	2457 MHz: 14.139193
+ *	2467 MHz: 11.914643
+ *	2472 MHz: 16.996074
+ *	2484 MHz: 15.175455
+ *	5180 MHz: -0.218548
+ *	5200 MHz: -2.204059
+ *	5220 MHz: -1.762898
+ *	5240 MHz: -1.314665
+ *	5260 MHz: -3.100989
+ *	5280 MHz: -2.157037
+ *	5300 MHz: -1.842629
+ *	5320 MHz: -1.498928
+ *	5500 MHz: 3.304770
+ *	5520 MHz: 2.345992
+ *	5540 MHz: 2.749775
+ *	5560 MHz: 2.390887
+ *	5580 MHz: 2.592958
+ *	5600 MHz: 2.420149
+ *	5620 MHz: 2.650282
+ *	5640 MHz: 2.954027
+ *	5660 MHz: 2.991007
+ *	5680 MHz: 2.955472
+ *	5700 MHz: 2.280499
+ *	5745 MHz: 2.388630
+ *	5765 MHz: 2.332542
+ *	5785 MHz: 0.955708
+ *	5805 MHz: 1.025377
+ *	5825 MHz: 0.843392
+ *	Ideal freq: 5260 MHz
  *
  *	[1] http://en.wikipedia.org/wiki/Near_and_far_field
  */
@@ -215,6 +275,7 @@ static long double compute_interference_factor(struct freq_survey *survey, __s8 
 	factor = survey->channel_time_busy - survey->channel_time_tx;
 	factor /= (survey->channel_time - survey->channel_time_tx);
 	factor *= (base_to_power(2, survey->noise - min_noise));
+	factor = log2(factor);
 
 	survey->interference_factor = factor;
 
