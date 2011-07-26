@@ -256,28 +256,30 @@ int handle_survey_dump(struct nl_msg *msg, void *arg)
 	return NL_SKIP;
 }
 
-static __u64 base_to_power(__u64 base, __u64 pow)
+static __u64 min(__u64 a, __u64 b)
 {
-	__u64 result = base;
+	return (a < b) ? a : b;
+}
 
-	if (pow == 0)
-		return 1;
-
-	pow--;
-	while (pow--)
-		result *= base;
-
-	return result;
+/*
+ * Make it fit in the used data type, this is done
+ * so that we always have sane values, otherwise the
+ * values will go out of bounds. We pick 2^30 as that
+ * 2^31 yields -inf on long double -- and we can add
+ * log(2^30) + log(2^30) in a long double as well.
+ */
+static __u64 log2_sane(__u64 val)
+{
+	return log2(min(1073741824, val));
 }
 
 static long double compute_interference_factor(struct freq_survey *survey, __s8 min_noise)
 {
 	long double factor;
 
-	factor = survey->channel_time_busy - survey->channel_time_tx;
-	factor /= (survey->channel_time - survey->channel_time_tx);
-	factor *= (base_to_power(2, survey->noise - min_noise));
-	factor = log2(factor);
+	factor = log2_sane(survey->channel_time_busy - survey->channel_time_tx);
+	factor -= log2_sane(survey->channel_time - survey->channel_time_tx);
+	factor += survey->noise - min_noise;
 
 	survey->interference_factor = factor;
 
