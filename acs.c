@@ -229,7 +229,7 @@ static int go_offchan_freq(struct nl80211_state *state, int devidx, int freq)
 	NLA_PUT_U32(msg, NL80211_ATTR_IFINDEX, devidx);
 	NLA_PUT_U32(msg, NL80211_ATTR_WIPHY_FREQ, freq);
 	/* 5 seconds is the max allowed, values passed are in ms */
-	NLA_PUT_U32(msg, NL80211_ATTR_DURATION, 5);
+	NLA_PUT_U32(msg, NL80211_ATTR_DURATION, 60);
 
 	nl_socket_set_cb(state->nl_sock, s_cb);
 
