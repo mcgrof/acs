@@ -15,7 +15,7 @@
 #define DIV_ROUND_UP(x, y) (((x) + (y - 1)) / (y))
 #define BIT(x) (1ULL<<(x))
 
-#ifndef CONFIG_LIBNL20
+#ifdef CONFIG_LIBNL1
 #  define nl_sock nl_handle
 #endif
 
