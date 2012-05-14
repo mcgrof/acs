@@ -368,7 +368,10 @@ void parse_freq_int_factor(void)
 				ideal_freq = freq;
 		}
 	}
-	printf("Ideal freq: %d MHz\n", ideal_freq->center_freq);
+	if (ideal_freq)
+		printf("Ideal freq: %d MHz\n", ideal_freq->center_freq);
+	else
+		fprintf(stderr, "invalid ideal freq! list empty.\n");
 }
 
 void annotate_enabled_chans(void)
